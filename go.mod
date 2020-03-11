@@ -9,4 +9,5 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
+	k8s.io/apimachinery v0.17.3
 )

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
   log "github.com/sirupsen/logrus"
   "text/template"
   "os"
@@ -15,6 +16,7 @@ global
     pidfile     /haproxy.pid
 
 {{ range $name, $config := . }}
+{{ if $config.Enabled }}
 
 frontend {{ $name }}
     bind :{{ $config.ListenPort }}
@@ -32,6 +34,7 @@ backend {{ $name }}
     timeout     server  30s
     server      static {{ $config.Destination.ServiceName }}.{{ $config.Destination.Namespace }}:{{ $config.Destination.Port }} {{ if $config.EnableProxyProtocol }} send-proxy {{ end }}
 
+{{ end }}
 {{ end }}
 `
 
@@ -55,13 +58,24 @@ func regenerateListeners(nodeMode bool, localLabels map[string]string) {
     return
   }
 
+  for name, ep := range exposes {
+    lbl, err := simpleToK8sLabels(ep.ExposeOn)
+    if err != nil {
+      localLog.WithFields(log.Fields{
+        "err": err,
+        "config": name,
+      }).Warning("failed to build label selector, disabling")
+      ep.Enabled = false
+      continue
+    }
+    ep.Enabled = lbl.Matches(labels.Set(myLabels))
+    localLog.WithField("config", name).WithField("enabled", ep.Enabled).Trace("parse ok")
+  }
+
   proto := template.Must(template.New("haproxy-config").Parse(haproxyConfig))
   if err := proto.Execute(os.Stdout, exposes); err != nil {
     localLog.WithField("err", err).Warn("template rendering failed")
   }
-
-
-
 
   localLog.Trace("finish")
 }

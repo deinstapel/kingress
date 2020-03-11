@@ -83,9 +83,9 @@ func watchNode(ctx context.Context, client *k8s.Client, nodeName string) {
       if err != nil {
         if !strings.Contains(err.Error(), "EOF") {
           log.WithField("err", err).Fatal("node watch errored")
-          break
         } else {
           log.Debug("node watch ended, restarting")
+          break
         }
       }
       if (t == k8s.EventDeleted) {

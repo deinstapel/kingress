@@ -48,6 +48,8 @@ func regenerateListeners(nodeMode bool, localLabels map[string]string) {
     "method": "regenerate",
   })
   localLog.Trace("start")
+  defer localLog.Trace("finish")
+
   if (nodeMode) {
     localLog.WithField("labels", localLabels).Trace("update labels")
     gotNode = true
@@ -73,11 +75,16 @@ func regenerateListeners(nodeMode bool, localLabels map[string]string) {
   }
 
   proto := template.Must(template.New("haproxy-config").Parse(haproxyConfig))
-  if err := proto.Execute(os.Stdout, exposes); err != nil {
+  cfgFile, err := os.OpenFile("/haproxy.cfg", os.O_RDWR|os.O_CREATE, 0600)
+  if err != nil {
+    localLog.WithField("err", err).Warn("open cfg file failed")
+    return
+  }
+  if err := proto.Execute(cfgFile, exposes); err != nil {
     localLog.WithField("err", err).Warn("template rendering failed")
   }
-
-  localLog.Trace("finish")
+  cfgFile.Close()
+  restartHaProxy()
 }
 
 func upsertListener(ep *ExposeConfig) {

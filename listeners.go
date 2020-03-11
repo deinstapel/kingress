@@ -75,7 +75,7 @@ func regenerateListeners(nodeMode bool, localLabels map[string]string) {
   }
 
   proto := template.Must(template.New("haproxy-config").Parse(haproxyConfig))
-  cfgFile, err := os.OpenFile("/haproxy.cfg", os.O_RDWR|os.O_CREATE, 0600)
+  cfgFile, err := os.Create("/haproxy.cfg")
   if err != nil {
     localLog.WithField("err", err).Warn("open cfg file failed")
     return
@@ -110,6 +110,7 @@ func deleteListener(ep *ExposeConfig) {
   })
   localLog.Debug("start")
   delete(exposes, *ep.Metadata.Name)
+  localLog.Trace(len(exposes))
   regenerateListeners(false, nil)
   localLog.Trace("finish")
 }

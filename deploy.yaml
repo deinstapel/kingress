@@ -83,7 +83,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: kingress
-        image: deinstapel/kingress:v1
+        image: deinstapel/kingress:v2
         env:
         - name: NODE_NAME
           valueFrom:

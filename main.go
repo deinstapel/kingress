@@ -10,7 +10,6 @@ import (
   "github.com/ericchiang/k8s"
   "github.com/ghodss/yaml"
   corev1 "github.com/ericchiang/k8s/apis/core/v1"
-  metav1 "github.com/ericchiang/k8s/apis/meta/v1"
 )
 
 func init() {
@@ -71,12 +70,12 @@ func watchNode(ctx context.Context, client *k8s.Client, nodeName string) {
   for {
     log.Trace("start node watch")
     node := &corev1.Node{}
-    node.Metadata = &metav1.ObjectMeta{ }
     nodeWatcher, err := client.Watch(ctx, k8s.AllNamespaces, node)
-    defer nodeWatcher.Close()
     if err != nil {
       log.WithField("err", err).Fatal("node watch failed, rbac ok?")
+      break
     }
+
     for {
       innerNode := &corev1.Node{}
       t, err := nodeWatcher.Next(innerNode)
@@ -101,23 +100,31 @@ func watchNode(ctx context.Context, client *k8s.Client, nodeName string) {
 }
 
 func watchCrd(ctx context.Context, client *k8s.Client) {
-  crdList := &ExposeConfig{}
-  crdWatcher, err := client.Watch(ctx, k8s.AllNamespaces, crdList)
-  if err != nil {
-    log.WithField("err", err).Fatal("Failed to watch CRDs")
-  }
   for {
-    exposeConfig := &ExposeConfig{}
-    t, err := crdWatcher.Next(exposeConfig)
+    log.Trace("start crd watch")
+    crdList := &ExposeConfig{}
+    crdWatcher, err := client.Watch(ctx, k8s.AllNamespaces, crdList)
     if err != nil {
-      log.WithField("err", err).Fatal("Received error event")
+      log.WithField("err", err).Fatal("Failed to watch CRDs")
       break
     }
-    if (t != k8s.EventDeleted) {
-      upsertListener(exposeConfig)
-    } else {
-      deleteListener(exposeConfig)
+
+    for {
+      exposeConfig := &ExposeConfig{}
+      t, err := crdWatcher.Next(exposeConfig)
+      if err != nil {
+        if !strings.Contains(err.Error(), "EOF") {
+          log.WithField("err", err).Fatal("node watch errored")
+        } else {
+          log.Debug("node watch ended, restarting")
+          break
+        }
+      }
+      if (t != k8s.EventDeleted) {
+        upsertListener(exposeConfig)
+      } else {
+        deleteListener(exposeConfig)
+      }
     }
   }
-  defer crdWatcher.Close()
 }

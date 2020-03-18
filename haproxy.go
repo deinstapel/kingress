@@ -4,7 +4,7 @@ import (
   log "github.com/sirupsen/logrus"
   "os/exec"
   "os"
-  "strconv"
+  "syscall"
 )
 
 const haproxyConfFile = "/haproxy.cfg"
@@ -18,23 +18,38 @@ func init() {
     log.WithField("err", err).Fatal("couldn't find haproxy")
   }
   haproxyBinary = bin
+
 }
-func restartHaProxy() {
-  cmdline := []string{"-db", "-f", haproxyConfFile}
-  if haproxyProcess != nil && haproxyProcess.ProcessState == nil && haproxyProcess.Process != nil {
-    cmdline = append(cmdline, "-sf", strconv.Itoa(haproxyProcess.Process.Pid))
-  }
+
+func startHaProxy() {
+  cmdline := []string{"-db", "-f", haproxyConfFile, "-W"}
   cmd := exec.Command(haproxyBinary, cmdline...)
   cmd.Stderr = os.Stderr
   cmd.Stdout = os.Stdout
-  if err := cmd.Start(); err != nil {
-    log.WithField("err", err).Fatal("HAProxy start failed")
-  }
-  go func() {
-    if err := cmd.Wait(); err != nil {
-      log.WithField("err", err).WithField("code", cmd.ProcessState.ExitCode()).Fatal("HAProxy error")
-    }
-    log.Info("HAProxy ended with code 0.")
-  }()
   haproxyProcess = cmd
+  if err := cmd.Run(); err != nil {
+    if (cmd.ProcessState != nil) {
+      log.WithField("err", err).WithField("code", cmd.ProcessState.ExitCode()).Fatal("haproxy exited")
+    } else {
+      log.WithField("err", err).Fatal("HAProxy start failed")
+    }
+  }
+}
+
+func stopHaProxy() {
+  if haproxyProcess != nil && haproxyProcess.Process != nil {
+    haproxyProcess.Process.Signal(syscall.SIGTERM)
+  }
+}
+
+func reloadHaProxy() {
+  if haproxyProcess == nil {
+    go startHaProxy()
+    return
+  }
+  if err := haproxyProcess.Process.Signal(syscall.SIGUSR2); err != nil {
+    log.WithField("err", err).Warning("failed to reload haproxy")
+  } else {
+    log.Info("reloaded haproxy")
+  }
 }

@@ -84,7 +84,7 @@ func regenerateListeners(nodeMode bool, localLabels map[string]string) {
     localLog.WithField("err", err).Warn("template rendering failed")
   }
   cfgFile.Close()
-  restartHaProxy()
+  reloadHaProxy()
 }
 
 func upsertListener(ep *ExposeConfig) {

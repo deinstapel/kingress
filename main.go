@@ -62,6 +62,7 @@ func main() {
   <-sigchan
 
   log.Info("Terminating")
+  stopHaProxy()
   cancel()
 }
 

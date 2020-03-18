@@ -24,14 +24,14 @@ frontend {{ $name }}
     log                  global
     option               {{ $config.ListenProto }}log
     option               dontlognull
-    timeout              client  30s
+    timeout              client  1800s
     default_backend {{ $name }}
 
 backend {{ $name }}
     mode        {{ $config.ListenProto }}
     balance     roundrobin
     timeout     connect 5s
-    timeout     server  30s
+    timeout     server  1800s
     server      static {{ $config.Destination.ServiceName }}.{{ $config.Destination.Namespace }}:{{ $config.Destination.Port }} {{ if $config.EnableProxyProtocol }} send-proxy {{ end }}
 
 {{ end }}

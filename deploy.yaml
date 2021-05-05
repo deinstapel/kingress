@@ -1,4 +1,4 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: exposeconfigs.network.deinstapel.de
@@ -14,13 +14,32 @@ spec:
     shortNames:
     - ec
   scope: Cluster
-  subresources:
-    status: {}
-  version: v1alpha1
   versions:
   - name: v1alpha1
     served: true
     storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          port:
+            type: "integer"
+          proto:
+            type: "string"
+          destination:
+            type: object
+            properties:
+              service:
+                type: "string"
+              namespace:
+                type: "string"
+              port:
+                type: "integer"
+          enableProxy:
+            type: "boolean"
+          exposeOn:
+            type: "object"
+            additionalProperties: true
 
 ---
 
@@ -83,9 +102,11 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: kingress
-        image: deinstapel/kingress:v4-master-testing2
+        image: deinstapel/kingress:v6
         env:
         - name: NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+
+---

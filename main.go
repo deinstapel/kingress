@@ -2,14 +2,14 @@ package main
 
 import (
   "context"
-  "strings"
+  "github.com/ericchiang/k8s"
+  corev1 "github.com/ericchiang/k8s/apis/core/v1"
+  "github.com/ghodss/yaml"
+  log "github.com/sirupsen/logrus"
   "io/ioutil"
   "os"
   "os/signal"
-  log "github.com/sirupsen/logrus"
-  "github.com/ericchiang/k8s"
-  "github.com/ghodss/yaml"
-  corev1 "github.com/ericchiang/k8s/apis/core/v1"
+  "strings"
 )
 
 func init() {

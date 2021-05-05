@@ -1,10 +1,13 @@
 package main
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
   log "github.com/sirupsen/logrus"
-  "text/template"
+  "k8s.io/apimachinery/pkg/labels"
+  "net"
   "os"
+  "strconv"
+  "text/template"
+  "time"
 )
 
 const haproxyConfig = `
@@ -41,6 +44,40 @@ backend {{ $name }}
 var myLabels = map[string]string{}
 var exposes = map[string]*ExposeConfig{}
 
+func checkReachability(ep *ExposeConfig) bool {
+  // From https://stackoverflow.com/a/56336811
+
+  timeout := time.Second
+  host := ep.Destination.ServiceName + "." + ep.Destination.Namespace
+  port := strconv.Itoa(ep.Destination.Port)
+
+  conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
+  if err != nil {
+    log.WithFields(log.Fields{
+      "err": err,
+      "config": ep.Metadata.Name,
+    }).Warning("Failed to reach destination service")
+
+    return false
+  }
+
+  defer conn.Close()
+  return true
+}
+
+func checkEnabled(ep *ExposeConfig) bool {
+  lbl, err := simpleToK8sLabels(ep.ExposeOn)
+  if err != nil {
+    log.WithFields(log.Fields{
+      "err": err,
+      "config": ep.Metadata.Name,
+    }).Warning("Failed to build label selector, disabling")
+    return false
+  }
+
+  return lbl.Matches(labels.Set(myLabels))
+}
+
 var gotNode = false
 func regenerateListeners(nodeMode bool, localLabels map[string]string) {
   localLog := log.WithFields(log.Fields{
@@ -61,21 +98,14 @@ func regenerateListeners(nodeMode bool, localLabels map[string]string) {
   }
 
   for name, ep := range exposes {
-    lbl, err := simpleToK8sLabels(ep.ExposeOn)
-    if err != nil {
-      localLog.WithFields(log.Fields{
-        "err": err,
-        "config": name,
-      }).Warning("failed to build label selector, disabling")
-      ep.Enabled = false
-      continue
-    }
-    ep.Enabled = lbl.Matches(labels.Set(myLabels))
+    isReachable := checkReachability(ep)
+    isEnabled := checkEnabled(ep)
+    ep.Enabled = isEnabled && isReachable
     localLog.WithField("config", name).WithField("enabled", ep.Enabled).Trace("parse ok")
   }
 
   proto := template.Must(template.New("haproxy-config").Parse(haproxyConfig))
-  cfgFile, err := os.Create("/haproxy.cfg")
+  cfgFile, err := os.Create(haproxyConfFile)
   if err != nil {
     localLog.WithField("err", err).Warn("open cfg file failed")
     return
